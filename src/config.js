@@ -12,6 +12,7 @@ export const WEAPON_DEFINITIONS = {
   knife: { damage: 1, range: 2, period: 5, phase: 'preEnemyMove', targeting: 'line', damagesObjects: true, effectColor: '#ffd166' },
   'orbiting-stone': { damage: 1, period: 7, phase: 'postEnemyMove', targeting: 'adjacent', damagesObjects: false, effectColor: '#8be9fd' },
   crossbow: { damage: 1, range: 6, period: 8, phase: 'preEnemyMove', targeting: 'first-in-line', damagesObjects: true, effectColor: '#8be9fd' },
+  axe: { damage: 1, range: 1, period: 6, phase: 'preEnemyMove', targeting: 'wide-line', damagesObjects: true, effectColor: '#ff9f68' },
 };
 
 export const UPGRADE_DEFINITIONS = [
@@ -22,6 +23,13 @@ export const UPGRADE_DEFINITIONS = [
   { id: 'magnetism', name: 'Magnetism', description: 'Pickup range +1', eligibility: () => true, apply: s => { s.player.pickupRange += 1; } },
   { id: 'orbiting-stone', name: 'Orbiting Stone', description: 'Every 7 turns, strike adjacent enemies', eligibility: s => !s.player.weapons.some(w => w.type === 'orbiting-stone'), apply: s => s.player.weapons.push({ id: 'orbiting-stone', type: 'orbiting-stone', ...WEAPON_DEFINITIONS['orbiting-stone'] }) },
   { id: 'crossbow', name: 'Crossbow', description: 'Every 8 turns, fire a bolt range 6', eligibility: s => !s.player.weapons.some(w => w.type === 'crossbow'), apply: s => s.player.weapons.push({ id: 'crossbow', type: 'crossbow', ...WEAPON_DEFINITIONS.crossbow }) },
+  { id: 'axe', name: 'Axe', description: 'Every 6 turns, strike three cells wide', eligibility: s => !s.player.weapons.some(w => w.type === 'axe'), apply: s => s.player.weapons.push({ id: 'axe', type: 'axe', ...WEAPON_DEFINITIONS.axe }) },
+  { id: 'heavy-stone', name: 'Heavy Stone', description: 'Orbiting Stone damage +1', eligibility: s => s.player.weapons.some(w => w.type === 'orbiting-stone'), apply: s => s.player.weapons.forEach(w => { if (w.type === 'orbiting-stone') w.damage += 1; }) },
+  { id: 'quick-stone', name: 'Quick Stone', description: 'Orbiting Stone fires one turn more often', eligibility: s => s.player.weapons.some(w => w.type === 'orbiting-stone' && w.period > 2), apply: s => s.player.weapons.forEach(w => { if (w.type === 'orbiting-stone') w.period = Math.max(2, w.period - 1); }) },
+  { id: 'reinforced-bolt', name: 'Reinforced Bolt', description: 'Crossbow damage +1', eligibility: s => s.player.weapons.some(w => w.type === 'crossbow'), apply: s => s.player.weapons.forEach(w => { if (w.type === 'crossbow') w.damage += 1; }) },
+  { id: 'long-bolt', name: 'Long Bolt', description: 'Crossbow range +2', eligibility: s => s.player.weapons.some(w => w.type === 'crossbow'), apply: s => s.player.weapons.forEach(w => { if (w.type === 'crossbow') w.range += 2; }) },
+  { id: 'heavy-axe', name: 'Heavy Axe', description: 'Axe damage +1', eligibility: s => s.player.weapons.some(w => w.type === 'axe'), apply: s => s.player.weapons.forEach(w => { if (w.type === 'axe') w.damage += 1; }) },
+  { id: 'regeneration', name: 'Regeneration', description: 'Restore 1 HP every 50 turns; each rank shortens the interval by 10', stackable: true, eligibility: () => true, apply: s => { s.player.regenerationLevel = (s.player.regenerationLevel || 0) + 1; } },
 ];
 
 export const SPAWN_BANDS = [

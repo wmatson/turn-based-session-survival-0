@@ -111,6 +111,21 @@ test('pots can drop health and gold pickups', () => {
   assert.equal(result.state.runGold, 2);
 });
 
+test('axe hits three side-by-side cells in its facing direction', () => {
+  let state = createGame({ seed: 21 }); state.player.weapons = [{ id:'axe', type:'axe', damage:1, range:1, period:1, phase:'preEnemyMove', targeting:'wide-line', damagesObjects:false }]; state.player.facing = 'east';
+  for (const [id, position] of [[1,[1,-1]],[2,[1,0]],[3,[1,1]]]) state.enemies.push({ id, type:'red-square', position, hp:1, spawnTurn:0, spawnPosition:position });
+  const result = act(state, ACTIONS.wait, rng([99,99,99]));
+  assert.equal(result.state.enemies.length, 0);
+  assert.deepEqual(result.events.find(e => e.type === 'weapon-fired').cells.map(cell => cell.join(',')).sort(), ['1,-1','1,0','1,1']);
+});
+
+test('regeneration heals every 50 turns and improves by 10 turns per rank', () => {
+  let state = createGame({ seed: 22 }); state.player.weapons = []; state.player.hp = 5; state.player.regenerationLevel = 1; state.turn = 49;
+  state = act(state).state; assert.equal(state.player.hp, 6);
+  state.player.hp = 5; state.player.regenerationLevel = 2; state.turn = 39;
+  state = act(state).state; assert.equal(state.player.hp, 6);
+});
+
 test('green circles move every two turns while red squares retain three-turn movement', () => {
   let state = createGame({ seed: 16 }); state.player.weapons = [];
   state.enemies.push({ id: 1, type:'green-circle', position:[4,0], hp:1, movementPeriod:2, spawnTurn:0, spawnPosition:[4,0] });
