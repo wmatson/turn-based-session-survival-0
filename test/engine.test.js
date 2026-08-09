@@ -67,6 +67,29 @@ test('spawn schedule and deterministic spawn perimeter', () => {
   assert.deepEqual(spawnRulesForTurn(50), [{ enemyType: 'red-square', count: 4 }]);
 });
 
+test('outrun enemies are respawned just outside the viewport', () => {
+  let state = createGame({ seed: 12 }); state.player.weapons = [];
+  state.enemies.push({ id: 1, type: 'red-square', position: [35, 0], hp: 1, spawnTurn: 0, spawnPosition: [35,0], movementPeriod: 3 });
+  const result = act(state, ACTIONS.wait, rng([0]));
+  const enemy = result.state.enemies[0];
+  assert.ok(Math.max(Math.abs(enemy.position[0]), Math.abs(enemy.position[1])) <= 27);
+  assert.ok(result.events.some(e => e.type === 'enemy-respawned'));
+});
+
+test('turn 200 introduces durable blue squares and fast green circles', () => {
+  let state = createGame({ seed: 15 }); state.turn = 199; state.player.weapons = [];
+  state = act(state, ACTIONS.wait, rng([0])).state;
+  assert.ok(state.enemies.some(e => e.type === 'blue-square' && e.hp === 3));
+  assert.ok(state.enemies.some(e => e.type === 'green-circle' && e.hp === 1 && e.movementPeriod === 2));
+});
+
+test('green circles move every two turns while red squares retain three-turn movement', () => {
+  let state = createGame({ seed: 16 }); state.player.weapons = [];
+  state.enemies.push({ id: 1, type:'green-circle', position:[4,0], hp:1, movementPeriod:2, spawnTurn:0, spawnPosition:[4,0] });
+  state = act(state).state; assert.deepEqual(state.enemies[0].position, [4,0]);
+  state = act(state).state; assert.deepEqual(state.enemies[0].position, [3,0]);
+});
+
 test('xp levels, choices are unique, and selected upgrade applies', () => {
   let state = createGame({ seed: 5 }); state.player.xp = 4; state.player.facing = 'east'; state.player.weapons[0].period = 1;
   state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
@@ -84,7 +107,7 @@ test('post-movement orbit stone can hit an enemy after it moves', () => {
 });
 
 test('victory at turn 200 and continue/exit controls', () => {
-  let state = createGame({ seed: 1 }); state.player.weapons=[]; state.turn=199;
+  let state = createGame({ seed: 1 }); state.player.weapons=[]; state.turn=499;
   state = act(state).state; assert.equal(state.status,'victory');
   state = step(state, ACTIONS.continue, rng()).state; assert.equal(state.status,'playing');
   state = step(state, ACTIONS.exit, rng()).state; assert.equal(state.status,'complete');

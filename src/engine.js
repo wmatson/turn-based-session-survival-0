@@ -1,4 +1,5 @@
 export const DIRECTIONS = ['north', 'south', 'east', 'west'];
+export const VICTORY_TURN = 500;
 export const DELTAS = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
 export const ACTIONS = {
   move: direction => ({ type: 'move', direction }),
@@ -20,7 +21,12 @@ const validRng = rng => rng && typeof rng.nextInt === 'function' ? rng : seededR
 export const seededRng = (seed = 1) => { let value = seed >>> 0; return { nextInt(max) { value = (Math.imul(value, 1664525) + 1013904223) >>> 0; return max ? value % max : 0; }, get state() { return value; } }; };
 
 export const xpRequired = level => 5 + (level - 1) * 3;
-export const spawnRulesForTurn = turn => turn >= 1 && turn < 50 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 2 }] : turn >= 50 && turn < 100 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 4 }] : turn >= 100 && turn < 150 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 8 }] : [];
+export const spawnRulesForTurn = turn => turn >= 200 && turn % 10 === 0 ? [{ enemyType: 'blue-square', count: 2 }, { enemyType: 'green-circle', count: 4 }] : turn >= 1 && turn < 50 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 2 }] : turn >= 50 && turn < 100 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 4 }] : turn >= 100 && turn < 150 && turn % 10 === 0 ? [{ enemyType: 'red-square', count: 8 }] : [];
+const enemyDefinitions = {
+  'red-square': { hp: 1, contactDamage: 1, movementPeriod: 3 },
+  'blue-square': { hp: 3, contactDamage: 2, movementPeriod: 3 },
+  'green-circle': { hp: 1, contactDamage: 1, movementPeriod: 2 },
+};
 
 const upgradePool = [
   { id: 'sharpened-knife', name: 'Sharpened Knife', description: 'Knife damage +1', eligibility: s => s.player.weapons.some(w => w.type === 'knife'), apply: s => s.player.weapons.forEach(w => { if (w.type === 'knife') w.damage += 1; }) },
@@ -33,9 +39,9 @@ const upgradePool = [
 ];
 const upgradeById = id => upgradePool.find(u => u.id === id);
 
-export const createGame = ({ seed = 1, permanent = {} } = {}) => {
+export const createGame = ({ seed = 1, permanent = {}, victoryTurn = VICTORY_TURN } = {}) => {
   const maxHp = 10 + (permanent.toughness || 0);
-  const state = { seed, map: { seed }, turn: 0, status: 'playing', victoryReached: false, runGold: 0, nextEntityId: 1,
+  const state = { seed, map: { seed }, turn: 0, victoryTurn, status: 'playing', victoryReached: false, runGold: 0, nextEntityId: 1,
     player: { position: [0, 0], facing: 'north', hp: maxHp, maxHp, xp: 0, level: 1, pickupRange: 1 + (permanent.startingMagnet || 0), upgrades: [],
       weapons: [{ id: 'knife', type: 'knife', damage: 1 + (permanent.sharpStart || 0), range: 2, period: 5, phase: 'preEnemyMove' }] },
     enemies: [], breakables: [], pickups: [], pendingUpgradeChoices: [] };
@@ -63,10 +69,10 @@ const fireWeapon = (state, weapon, events, rng) => {
 const runWeapons = (state, phase, events, rng) => { for (const weapon of state.player.weapons) if (weapon.phase === phase && state.turn % weapon.period === 0) fireWeapon(state, weapon, events, rng); };
 const enemyOrder = (a, b) => a.spawnTurn - b.spawnTurn || distance(a.spawnPosition, [0,0]) - distance(b.spawnPosition, [0,0]) || a.spawnPosition[0] - b.spawnPosition[0] || a.spawnPosition[1] - b.spawnPosition[1] || a.id - b.id;
 const moveEnemies = (state, events) => {
-  if (state.turn % 3) return;
   const ordered = [...state.enemies].sort(enemyOrder);
   for (const enemy of ordered) {
     if (!state.enemies.some(e => e.id === enemy.id)) continue;
+    if (state.turn % (enemy.movementPeriod ?? enemyDefinitions[enemy.type]?.movementPeriod ?? 3)) continue;
     const dx = state.player.position[0] - enemy.position[0], dy = state.player.position[1] - enemy.position[1];
     const direction = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'east' : 'west') : (dy >= 0 ? 'south' : 'north');
     const destination = pos(enemy.position, direction);
@@ -75,8 +81,25 @@ const moveEnemies = (state, events) => {
     enemy.position = destination; events.push(event('enemy-moved', { enemyId: enemy.id, position: [...destination] }));
   }
 };
+const spawnCandidates = (state, distanceFromPlayer = 27) => {
+  const candidates = [], p = state.player.position, d = distanceFromPlayer;
+  for (let x = p[0]-d; x <= p[0]+d; x++) candidates.push([x,p[1]-d],[x,p[1]+d]);
+  for (let y = p[1]-d+1; y < p[1]+d; y++) candidates.push([p[0]-d,y],[p[0]+d,y]);
+  return candidates.filter(c => terrainAt(state.map,...c) === 'floor' && !occupied(state,c));
+};
+const respawnOutrunEnemies = (state, rng, events) => {
+  for (const enemy of state.enemies) {
+    const dx = Math.abs(enemy.position[0] - state.player.position[0]), dy = Math.abs(enemy.position[1] - state.player.position[1]);
+    if (Math.max(dx, dy) <= 29) continue;
+    const valid = spawnCandidates(state, 27).filter(c => c[0] !== enemy.position[0] || c[1] !== enemy.position[1]);
+    if (!valid.length) continue;
+    enemy.position = [...valid[rng.nextInt(valid.length)]];
+    enemy.spawnPosition = [...enemy.position];
+    events.push(event('enemy-respawned', { enemyId: enemy.id, position: [...enemy.position] }));
+  }
+};
 const spawnEnemies = (state, rules, rng, events) => {
-  for (const rule of rules) for (let i = 0; i < rule.count; i++) { const candidates = []; const p = state.player.position, d = 27; for (let x = p[0]-d; x <= p[0]+d; x++) candidates.push([x,p[1]-d],[x,p[1]+d]); for (let y = p[1]-d+1; y < p[1]+d; y++) candidates.push([p[0]-d,y],[p[0]+d,y]); const valid = candidates.filter(c => terrainAt(state.map,...c) === 'floor' && !occupied(state,c)); if (!valid.length) continue; const location = valid[rng.nextInt(valid.length)]; const enemy = { id: state.nextEntityId++, type: rule.enemyType, position: [...location], hp: 1, contactDamage: 1, movementPeriod: 3, spawnTurn: state.turn, spawnPosition: [...location] }; state.enemies.push(enemy); events.push(event('enemy-spawned', { enemyId: enemy.id, position: [...location], enemyType: rule.enemyType })); }
+  for (const rule of rules) for (let i = 0; i < rule.count; i++) { const valid = spawnCandidates(state, 27); if (!valid.length) continue; const location = valid[rng.nextInt(valid.length)], definition = enemyDefinitions[rule.enemyType] ?? enemyDefinitions['red-square']; const enemy = { id: state.nextEntityId++, type: rule.enemyType, position: [...location], hp: definition.hp, contactDamage: definition.contactDamage, movementPeriod: definition.movementPeriod, spawnTurn: state.turn, spawnPosition: [...location] }; state.enemies.push(enemy); events.push(event('enemy-spawned', { enemyId: enemy.id, position: [...location], enemyType: rule.enemyType })); }
 };
 const collectPickups = (state, events) => { const remaining = []; for (const pickup of state.pickups) { if (distance(state.player.position, pickup.position) > state.player.pickupRange) { remaining.push(pickup); continue; } events.push(event('pickup-collected', { pickupType: pickup.type, value: pickup.value, position: [...pickup.position] })); if (pickup.type === 'xp') { state.player.xp += pickup.value; events.push(event('xp-gained', { amount: pickup.value })); } if (pickup.type === 'health') { const before = state.player.hp; state.player.hp = Math.min(state.player.maxHp, state.player.hp + pickup.value); if (state.player.hp !== before) events.push(event('player-healed', { amount: state.player.hp - before })); } } state.pickups = remaining; };
 const offerLevelUps = (state, rng, events) => { while (state.player.xp >= xpRequired(state.player.level)) { state.player.xp -= xpRequired(state.player.level); state.player.level += 1; events.push(event('level-gained', { level: state.player.level })); const eligible = upgradePool.filter(u => u.eligibility(state) && !state.player.upgrades.includes(u.id)); const pool = [...eligible], choices = []; while (choices.length < Math.min(3, pool.length)) { const index = rng.nextInt(pool.length); choices.push(pool.splice(index, 1)[0].id); } state.pendingUpgradeChoices = choices; state.status = 'level-up'; events.push(event('upgrade-options-generated', { choices: [...choices] })); break; } };
@@ -91,7 +114,7 @@ export const step = (input, action, providedRng) => {
   if (state.status !== 'playing' || !['move','wait','wait-facing'].includes(action?.type)) return { state, events: [] };
   state.turn += 1;
   if (action.type === 'move' || action.type === 'wait-facing') { const direction = action.direction; if (action.type === 'move') { state.player.facing = direction; const destination = pos(state.player.position, direction, 1); if (terrainAt(state.map,...destination) === 'wall' || occupied(state,destination)) events.push(event('player-blocked', { position: [...state.player.position] })); else { state.player.position = destination; events.push(event('player-moved', { position: [...destination] })); } } else { state.player.facing = direction; events.push(event('player-facing-changed', { direction })); } }
-  runWeapons(state, 'preEnemyMove', events, rng); if (state.status === 'playing') moveEnemies(state, events); if (state.status === 'playing') runWeapons(state, 'postEnemyMove', events, rng); if (state.status === 'playing') { spawnEnemies(state, spawnRulesForTurn(state.turn), rng, events); collectPickups(state, events); offerLevelUps(state, rng, events); if (state.turn >= 200 && !state.victoryReached && state.status === 'playing') { state.status = 'victory'; state.victoryReached = true; events.push(event('victory-reached')); } } return { state, events };
+  runWeapons(state, 'preEnemyMove', events, rng); if (state.status === 'playing') moveEnemies(state, events); if (state.status === 'playing') respawnOutrunEnemies(state, rng, events); if (state.status === 'playing') runWeapons(state, 'postEnemyMove', events, rng); if (state.status === 'playing') { spawnEnemies(state, spawnRulesForTurn(state.turn), rng, events); collectPickups(state, events); offerLevelUps(state, rng, events); if (state.turn >= state.victoryTurn && !state.victoryReached && state.status === 'playing') { state.status = 'victory'; state.victoryReached = true; events.push(event('victory-reached')); } } return { state, events };
 };
 
 export const getUpgrade = id => upgradeById(id);
