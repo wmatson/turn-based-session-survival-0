@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  ACTIONS, createGame, step, terrainAt, chunkOf, distance,
+  chooseUpgrade, xpRequired, spawnRulesForTurn, hashSeed,
+} from '../src/engine.js';
+
+const rng = (values = []) => { let i = 0; return { nextInt(max) { return values.length ? values[i++ % values.length] % max : 0; } }; };
+const act = (state, action = ACTIONS.wait, random = rng()) => step(state, action, random);
+
+ test('initial state and directional movement/facing', () => {
+  const state = createGame({ seed: 7 });
+  assert.deepEqual(state.player.position, [0, 0]);
+  assert.equal(state.player.facing, 'north');
+  let result = act(state, ACTIONS.moveEast);
+  assert.deepEqual(result.state.player.position, [1, 0]);
+  assert.equal(result.state.player.facing, 'east');
+  result = act(result.state, ACTIONS.waitFacing('south'));
+  assert.deepEqual(result.state.player.position, [1, 0]);
+  assert.equal(result.state.player.facing, 'south');
+  assert.equal(result.state.turn, 2);
+});
+
+test('terrain chunks are deterministic, bounded, and support negative coordinates', () => {
+  assert.deepEqual(chunkOf(-1, 20), [-1, 1]);
+  assert.equal(terrainAt({ seed: 42 }, 0, 0), 'floor');
+  const first = [], second = [];
+  for (let x = -20; x < 0; x++) for (let y = -20; y < 0; y++) if (terrainAt({ seed: 42 }, x, y) === 'wall') first.push([x,y]);
+  for (let x = -20; x < 0; x++) for (let y = -20; y < 0; y++) if (terrainAt({ seed: 42 }, x, y) === 'wall') second.push([x,y]);
+  assert.deepEqual(first, second);
+  assert.equal(first.length, 15);
+});
+
+test('blocked movement changes facing but not position', () => {
+  const state = createGame({ seed: 3 });
+  state.breakables.push({ id: 99, type: 'jar', position: [1, 0], hp: 1 });
+  const result = act(state, ACTIONS.moveEast);
+  assert.deepEqual(result.state.player.position, [0, 0]);
+  assert.equal(result.state.player.facing, 'east');
+  assert.ok(result.events.some(e => e.type === 'player-blocked'));
+});
+
+test('knife fires on turn five before enemy movement and kills in range', () => {
+  let state = createGame({ seed: 1 });
+  state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2,0] });
+  for (let i = 0; i < 5; i++) { const result = act(state, i === 0 ? ACTIONS.waitFacing('east') : ACTIONS.wait); state = result.state; if (i === 4) { assert.ok(result.events.some(e => e.type === 'weapon-fired' && e.weapon === 'knife')); assert.equal(state.enemies.length, 0); assert.equal(state.player.xp, 1); } }
+});
+
+test('red squares move every third turn and contact damages without entering player cell', () => {
+  let state = createGame({ seed: 2 });
+  state.enemies.push({ id: 1, type: 'red-square', position: [3, 0], hp: 1, spawnTurn: 0, spawnPosition: [3,0] });
+  state.player.weapons = [];
+  state = act(state).state; assert.deepEqual(state.enemies[0].position, [3,0]);
+  state = act(state).state; assert.deepEqual(state.enemies[0].position, [3,0]);
+  state = act(state).state; assert.deepEqual(state.enemies[0].position, [2,0]);
+  state = act(state).state; assert.equal(state.player.hp, 10);
+  state = act(state).state; state = act(state).state; state = act(state).state; state = act(state).state; state = act(state).state;
+  assert.equal(state.player.hp, 9); assert.deepEqual(state.enemies[0].position, [1,0]);
+});
+
+test('spawn schedule and deterministic spawn perimeter', () => {
+  let state = createGame({ seed: 9 });
+  for (let i = 0; i < 10; i++) state = act(state, ACTIONS.wait, rng([0])).state;
+  assert.equal(state.enemies.length, 2);
+  assert.ok(state.enemies.every(e => Math.max(Math.abs(e.position[0]), Math.abs(e.position[1])) >= 27));
+  assert.deepEqual(spawnRulesForTurn(10), [{ enemyType: 'red-square', count: 2 }]);
+  assert.deepEqual(spawnRulesForTurn(50), [{ enemyType: 'red-square', count: 4 }]);
+});
+
+test('xp levels, choices are unique, and selected upgrade applies', () => {
+  let state = createGame({ seed: 5 }); state.player.xp = 4; state.player.facing = 'east'; state.player.weapons[0].period = 1;
+  state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
+  let result = act(state, ACTIONS.wait); state = result.state;
+  assert.equal(state.pendingUpgradeChoices.length, 3); assert.equal(new Set(state.pendingUpgradeChoices).size, 3);
+  const selected = chooseUpgrade(state, state.pendingUpgradeChoices[0]);
+  assert.equal(selected.pendingUpgradeChoices.length, 0); assert.equal(selected.player.level, 2);
+});
+
+test('post-movement orbit stone can hit an enemy after it moves', () => {
+  let state = createGame({ seed: 8 }); state.player.weapons = [{ id:'orbiting-stone', type:'orbiting-stone', damage:1, period:7, phase:'postEnemyMove', nextFire:7 }];
+  state.enemies.push({ id:1,type:'red-square',position:[2,0],hp:1,spawnTurn:0,spawnPosition:[2,0] });
+  for (let i=0;i<7;i++) state=act(state).state;
+  assert.equal(state.enemies.length, 0);
+});
+
+test('victory at turn 200 and continue/exit controls', () => {
+  let state = createGame({ seed: 1 }); state.player.weapons=[]; state.turn=199;
+  state = act(state).state; assert.equal(state.status,'victory');
+  state = step(state, ACTIONS.continue, rng()).state; assert.equal(state.status,'playing');
+  state = step(state, ACTIONS.exit, rng()).state; assert.equal(state.status,'complete');
+});
+
+test('identical scripted runs are deterministic', () => {
+  const actions = Array.from({length:100}, (_, i) => [ACTIONS.moveNorth,ACTIONS.moveEast,ACTIONS.wait,ACTIONS.moveSouth][i%4]);
+  const run = () => { let s=createGame({seed:123}); for(const a of actions) s=step(s,a,rng([17,3,9,1])).state; return s; };
+  assert.deepEqual(run(), run());
+});
+
+test('xp requirement and hash seed are stable', () => { assert.equal(xpRequired(1),5); assert.equal(xpRequired(3),11); assert.equal(hashSeed(1,2,3),hashSeed(1,2,3)); assert.notEqual(distance([0,0],[1,1]),1); });

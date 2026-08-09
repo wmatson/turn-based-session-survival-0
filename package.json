@@ -1,0 +1,7 @@
+{
+  "name": "turn-based-session-survival",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test", "start": "npx --yes serve .", "build": "node -e \"console.log('Static site: no build step required')\""}
+}
