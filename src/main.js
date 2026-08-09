@@ -3,7 +3,7 @@ import { renderGame } from './renderer.js';
 import { addGold, loadProgress, saveProgress, buyPermanent, permanentCosts } from './persistence.js';
 
 const $ = id => document.getElementById(id);
-let progress = loadProgress(), state = null, debug = false, locked = false, effects = [];
+let progress = loadProgress(), state = null, debug = false, effects = [];
 const directionKeys = { ArrowUp:'north', w:'north', W:'north', ArrowDown:'south', s:'south', S:'south', ArrowLeft:'west', a:'west', A:'west', ArrowRight:'east', d:'east', D:'east' };
 const randomSeed = () => globalThis.crypto?.getRandomValues ? globalThis.crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random() * 2 ** 32);
 const rng = () => seededRng((state?.seed || 1) + state?.turn * 7919 + state?.nextEntityId);
@@ -16,7 +16,7 @@ const showLevelUp = () => { const choices=state.pendingUpgradeChoices; modal('Le
 const finishRun = () => { progress=addGold(progress,state.runGold);saveProgress(progress);showBetween(); };
 const showEffects = events => { for (const event of events) { if (event.type === 'weapon-fired') { const effect = { type:'weapon-fired', weapon:event.weapon, direction:event.direction, cells:event.cells }; effects=[...effects,effect]; setTimeout(()=>{ effects=effects.filter(item=>item!==effect); render(); },260); } if (event.type === 'player-moved' || event.type === 'enemy-moved') { const effect = { type:'movement-trail', entityId:event.enemyId ?? 'player', from:event.from, to:event.position }; effects=[...effects,effect]; setTimeout(()=>{ effects=effects.filter(item=>item!==effect); render(); },350); } if (event.type === 'player-damaged') { $('run').classList.remove('damage-flash'); void $('run').offsetWidth; $('run').classList.add('damage-flash'); setTimeout(()=>$('run').classList.remove('damage-flash'),220); } } };
 const afterStep = result => { state=result.state; showEffects(result.events); render(); if(state.status==='level-up') showLevelUp(); else if(state.status==='victory') modal('Victory',`You survived turn ${state.turn}. Continue indefinitely or bank your ${state.runGold} gold.`,[{label:'Continue',primary:true,run:()=>{state=step(state,ACTIONS.continue,rng()).state;render();}},{label:'Exit Run',run:finishRun}]); else if(state.status==='dead') modal('Run ended',`The Red Squares overwhelmed you on turn ${state.turn}.`,[{label:'Return to camp',primary:true,run:finishRun}]); else if(state.status==='complete') finishRun(); };
-const doAction = action => { if(!state||locked||state.status!=='playing')return; locked=true; afterStep(step(state,action,rng())); setTimeout(()=>locked=false,100); };
+const doAction = action => { if(!state||state.status!=='playing')return; afterStep(step(state,action,rng())); };
 $('start').onclick=()=>{const seed=Number($('seed').value)||randomSeed();effects=[];state=createGame({seed,permanent:progress.permanentUpgrades});$('between').hidden=true;$('run').hidden=false;render();};
 $('exit').onclick=()=>{if(state)finishRun();};
 $('debug').onclick=()=>{debug=!debug;render();};
