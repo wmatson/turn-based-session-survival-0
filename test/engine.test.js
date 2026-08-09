@@ -8,6 +8,13 @@ import {
 const rng = (values = []) => { let i = 0; return { nextInt(max) { return values.length ? values[i++ % values.length] % max : 0; } }; };
 const act = (state, action = ACTIONS.wait, random = rng()) => step(state, action, random);
 
+ test('invalid directional actions are ignored without corrupting state', () => {
+  const state = createGame({ seed: 7 });
+  const result = act(state, { type: 'move', direction: 'bogus' });
+  assert.deepEqual(result.state, state);
+  assert.deepEqual(act(state, { type: 'wait-facing', direction: 'bogus' }).state, state);
+});
+
  test('initial state and directional movement/facing', () => {
   const state = createGame({ seed: 7 });
   assert.deepEqual(state.player.position, [0, 0]);
@@ -149,7 +156,7 @@ test('post-movement orbit stone can hit an enemy after it moves', () => {
   assert.equal(state.enemies.length, 0);
 });
 
-test('victory at turn 200 and continue/exit controls', () => {
+test('victory at turn 500 and continue/exit controls', () => {
   let state = createGame({ seed: 1 }); state.player.weapons=[]; state.turn=499;
   state = act(state).state; assert.equal(state.status,'victory');
   state = step(state, ACTIONS.continue, rng()).state; assert.equal(state.status,'playing');
