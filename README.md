@@ -23,11 +23,15 @@ The debug button shows the current world coordinate and entity counter. Use the 
 
 ## Project layout
 
-- `src/engine.js`: pure state transition engine and deterministic seeded RNG
+- `src/config.js`: editable enemy, weapon, upgrade, wave, and permanent-progression definitions
+- `src/engine.js`: pure state transition engine
+- `src/engine/`: terrain, RNG, action constants, and wave-selection helpers used by the engine
 - `src/renderer.js`: SVG presentation only
 - `src/main.js`: browser input and run flow
 - `src/persistence.js`: replaceable permanent progression storage
 - `test/engine.test.js`: engine regression and determinism tests
+
+To create a variant, start with `src/config.js`: add or modify enemy/weapon/upgrade definitions and spawn bands without changing the state-transition engine. Targeting behavior names such as `line`, `first-in-line`, and `adjacent` are interpreted by the engine.
 
 ## GitHub Pages
 
