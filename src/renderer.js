@@ -1,13 +1,13 @@
-import { terrainAt } from './engine.js';
+import { terrainAt, VIEWPORT_RADIUS } from './engine.js';
 const NS = 'http://www.w3.org/2000/svg';
 const svgEl = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
 const color = { floor: '#151c2d', wall: '#4d5a70' };
-const inViewport = (position, playerPosition) => Math.abs(position[0] - playerPosition[0]) <= 25 && Math.abs(position[1] - playerPosition[1]) <= 25;
+const inViewport = (position, playerPosition) => Math.abs(position[0] - playerPosition[0]) <= VIEWPORT_RADIUS && Math.abs(position[1] - playerPosition[1]) <= VIEWPORT_RADIUS;
 const weaponPoints = (x, y, direction) => ({ north:`${x+2},${y+10} ${x+6},${y+2} ${x+10},${y+10}`, south:`${x+2},${y+2} ${x+6},${y+10} ${x+10},${y+2}`, east:`${x+2},${y+2} ${x+10},${y+6} ${x+2},${y+10}`, west:`${x+10},${y+2} ${x+2},${y+6} ${x+10},${y+10}` })[direction] || `${x+2},${y+2} ${x+10},${y+6} ${x+2},${y+10}`;
 export const renderGame = (svg, state, debug = false, effects = []) => {
-  svg.replaceChildren(); const size = 12, half = 25, view = svgEl('g'); svg.append(view); svg.setAttribute('viewBox', `0 0 ${size*51} ${size*51}`);
+  svg.replaceChildren(); const size = 12, half = VIEWPORT_RADIUS, dimension = VIEWPORT_RADIUS * 2 + 1, view = svgEl('g'); svg.append(view); svg.setAttribute('viewBox', `0 0 ${size*dimension} ${size*dimension}`);
   const [px,py] = state.player.position;
-  for (let row=0; row<51; row++) for (let col=0; col<51; col++) { const x=px+col-half, y=py+row-half; const tile=svgEl('rect',{x:col*size,y:row*size,width:size-0.5,height:size-0.5,fill:color[terrainAt(state.map,x,y)]}); view.append(tile); }
+  for (let row=0; row<dimension; row++) for (let col=0; col<dimension; col++) { const x=px+col-half, y=py+row-half; const tile=svgEl('rect',{x:col*size,y:row*size,width:size-0.5,height:size-0.5,fill:color[terrainAt(state.map,x,y)]}); view.append(tile); }
   const at = p => [(p[0]-px+half)*size, (p[1]-py+half)*size];
   for (const object of state.breakables) if (inViewport(object.position,state.player.position)) { const [x,y]=at(object.position); view.append(svgEl('rect',{x:x+2,y:y+2,width:8,height:8,fill:'none',stroke:'#d9a441','stroke-width':2,rx:2})); }
   for (const pickup of state.pickups) if (inViewport(pickup.position,state.player.position)) { const [x,y]=at(pickup.position); if(pickup.type==='xp') view.append(svgEl('polygon',{points:`${x+6},${y+2} ${x+10},${y+6} ${x+6},${y+10} ${x+2},${y+6}`,fill:'#62d6ff'})); else view.append(svgEl('path',{d:`M${x+4} ${y+2}h4v4h4v4H8v4H4v-4H0V6h4z`,transform:`translate(${x+0},${y-2})`,fill:'#67e58b'})); }

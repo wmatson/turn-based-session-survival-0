@@ -62,7 +62,7 @@ test('spawn schedule and deterministic spawn perimeter', () => {
   let state = createGame({ seed: 9 });
   for (let i = 0; i < 10; i++) state = act(state, ACTIONS.wait, rng([0])).state;
   assert.equal(state.enemies.length, 2);
-  assert.ok(state.enemies.every(e => Math.max(Math.abs(e.position[0]), Math.abs(e.position[1])) >= 27));
+  assert.ok(state.enemies.every(e => Math.max(Math.abs(e.position[0]), Math.abs(e.position[1])) >= 17));
   assert.deepEqual(spawnRulesForTurn(10), [{ enemyType: 'red-square', count: 2 }]);
   assert.deepEqual(spawnRulesForTurn(50), [{ enemyType: 'red-square', count: 4 }]);
 });
@@ -72,7 +72,7 @@ test('outrun enemies are respawned just outside the viewport', () => {
   state.enemies.push({ id: 1, type: 'red-square', position: [35, 0], hp: 1, spawnTurn: 0, spawnPosition: [35,0], movementPeriod: 3 });
   const result = act(state, ACTIONS.wait, rng([0]));
   const enemy = result.state.enemies[0];
-  assert.ok(Math.max(Math.abs(enemy.position[0]), Math.abs(enemy.position[1])) <= 27);
+  assert.ok(Math.max(Math.abs(enemy.position[0]), Math.abs(enemy.position[1])) <= 17);
   assert.ok(result.events.some(e => e.type === 'enemy-respawned'));
 });
 

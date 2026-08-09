@@ -1,5 +1,8 @@
 export const DIRECTIONS = ['north', 'south', 'east', 'west'];
 export const VICTORY_TURN = 500;
+export const VIEWPORT_RADIUS = 15;
+export const SPAWN_RADIUS = VIEWPORT_RADIUS + 2;
+export const OUTRUN_RADIUS = VIEWPORT_RADIUS + 4;
 export const DELTAS = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
 export const ACTIONS = {
   move: direction => ({ type: 'move', direction }),
@@ -81,7 +84,7 @@ const moveEnemies = (state, events) => {
     enemy.position = destination; events.push(event('enemy-moved', { enemyId: enemy.id, position: [...destination] }));
   }
 };
-const spawnCandidates = (state, distanceFromPlayer = 27) => {
+const spawnCandidates = (state, distanceFromPlayer = SPAWN_RADIUS) => {
   const candidates = [], p = state.player.position, d = distanceFromPlayer;
   for (let x = p[0]-d; x <= p[0]+d; x++) candidates.push([x,p[1]-d],[x,p[1]+d]);
   for (let y = p[1]-d+1; y < p[1]+d; y++) candidates.push([p[0]-d,y],[p[0]+d,y]);
@@ -90,8 +93,8 @@ const spawnCandidates = (state, distanceFromPlayer = 27) => {
 const respawnOutrunEnemies = (state, rng, events) => {
   for (const enemy of state.enemies) {
     const dx = Math.abs(enemy.position[0] - state.player.position[0]), dy = Math.abs(enemy.position[1] - state.player.position[1]);
-    if (Math.max(dx, dy) <= 29) continue;
-    const valid = spawnCandidates(state, 27).filter(c => c[0] !== enemy.position[0] || c[1] !== enemy.position[1]);
+    if (Math.max(dx, dy) <= OUTRUN_RADIUS) continue;
+    const valid = spawnCandidates(state, SPAWN_RADIUS).filter(c => c[0] !== enemy.position[0] || c[1] !== enemy.position[1]);
     if (!valid.length) continue;
     enemy.position = [...valid[rng.nextInt(valid.length)]];
     enemy.spawnPosition = [...enemy.position];
@@ -99,7 +102,7 @@ const respawnOutrunEnemies = (state, rng, events) => {
   }
 };
 const spawnEnemies = (state, rules, rng, events) => {
-  for (const rule of rules) for (let i = 0; i < rule.count; i++) { const valid = spawnCandidates(state, 27); if (!valid.length) continue; const location = valid[rng.nextInt(valid.length)], definition = enemyDefinitions[rule.enemyType] ?? enemyDefinitions['red-square']; const enemy = { id: state.nextEntityId++, type: rule.enemyType, position: [...location], hp: definition.hp, contactDamage: definition.contactDamage, movementPeriod: definition.movementPeriod, spawnTurn: state.turn, spawnPosition: [...location] }; state.enemies.push(enemy); events.push(event('enemy-spawned', { enemyId: enemy.id, position: [...location], enemyType: rule.enemyType })); }
+  for (const rule of rules) for (let i = 0; i < rule.count; i++) { const valid = spawnCandidates(state, SPAWN_RADIUS); if (!valid.length) continue; const location = valid[rng.nextInt(valid.length)], definition = enemyDefinitions[rule.enemyType] ?? enemyDefinitions['red-square']; const enemy = { id: state.nextEntityId++, type: rule.enemyType, position: [...location], hp: definition.hp, contactDamage: definition.contactDamage, movementPeriod: definition.movementPeriod, spawnTurn: state.turn, spawnPosition: [...location] }; state.enemies.push(enemy); events.push(event('enemy-spawned', { enemyId: enemy.id, position: [...location], enemyType: rule.enemyType })); }
 };
 const collectPickups = (state, events) => { const remaining = []; for (const pickup of state.pickups) { if (distance(state.player.position, pickup.position) > state.player.pickupRange) { remaining.push(pickup); continue; } events.push(event('pickup-collected', { pickupType: pickup.type, value: pickup.value, position: [...pickup.position] })); if (pickup.type === 'xp') { state.player.xp += pickup.value; events.push(event('xp-gained', { amount: pickup.value })); } if (pickup.type === 'health') { const before = state.player.hp; state.player.hp = Math.min(state.player.maxHp, state.player.hp + pickup.value); if (state.player.hp !== before) events.push(event('player-healed', { amount: state.player.hp - before })); } } state.pickups = remaining; };
 const offerLevelUps = (state, rng, events) => { while (state.player.xp >= xpRequired(state.player.level)) { state.player.xp -= xpRequired(state.player.level); state.player.level += 1; events.push(event('level-gained', { level: state.player.level })); const eligible = upgradePool.filter(u => u.eligibility(state) && !state.player.upgrades.includes(u.id)); const pool = [...eligible], choices = []; while (choices.length < Math.min(3, pool.length)) { const index = rng.nextInt(pool.length); choices.push(pool.splice(index, 1)[0].id); } state.pendingUpgradeChoices = choices; state.status = 'level-up'; events.push(event('upgrade-options-generated', { choices: [...choices] })); break; } };
