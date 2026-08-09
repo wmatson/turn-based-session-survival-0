@@ -83,6 +83,34 @@ test('turn 200 introduces durable blue squares and fast green circles', () => {
   assert.ok(state.enemies.some(e => e.type === 'green-circle' && e.hp === 1 && e.movementPeriod === 2));
 });
 
+test('blue squares award more XP than basic enemies', () => {
+  let state = createGame({ seed: 17 }); state.player.weapons = [{ id:'knife', type:'knife', damage:1, range:2, period:1, phase:'preEnemyMove', targeting:'line', damagesObjects:false }]; state.player.facing = 'east';
+  state.enemies.push({ id: 1, type:'blue-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
+  state = act(state, ACTIONS.wait, rng([99])).state;
+  assert.equal(state.player.xp, 3);
+});
+
+test('enemy gold drops are chance-based while XP always drops', () => {
+  let state = createGame({ seed: 18 }); state.player.weapons = [{ id:'knife', type:'knife', damage:1, range:2, period:1, phase:'preEnemyMove', targeting:'line', damagesObjects:false }]; state.player.facing = 'east';
+  state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
+  state = act(state, ACTIONS.wait, rng([99])).state;
+  assert.equal(state.player.xp, 1); assert.equal(state.runGold, 0);
+  state = createGame({ seed: 19 }); state.player.weapons = [{ id:'knife', type:'knife', damage:1, range:2, period:1, phase:'preEnemyMove', targeting:'line', damagesObjects:false }]; state.player.facing = 'east';
+  state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
+  state = act(state, ACTIONS.wait, rng([1])).state;
+  assert.equal(state.player.xp, 1); assert.equal(state.runGold, 1);
+});
+
+test('pots can drop health and gold pickups', () => {
+  let state = createGame({ seed: 20 }); state.player.weapons = [{ id:'knife', type:'knife', damage:1, range:2, period:1, phase:'preEnemyMove', targeting:'line', damagesObjects:true }]; state.player.facing = 'east';
+  state.breakables = [{ id: 99, type:'jar', position:[1,0], hp:1 }];
+  const result = act(state, ACTIONS.wait, rng([0, 0]));
+  assert.equal(result.state.breakables.length, 0);
+  assert.ok(result.events.some(e => e.type === 'pickup-spawned' && e.pickupType === 'health'));
+  assert.ok(result.events.some(e => e.type === 'pickup-spawned' && e.pickupType === 'gold'));
+  assert.equal(result.state.runGold, 2);
+});
+
 test('green circles move every two turns while red squares retain three-turn movement', () => {
   let state = createGame({ seed: 16 }); state.player.weapons = [];
   state.enemies.push({ id: 1, type:'green-circle', position:[4,0], hp:1, movementPeriod:2, spawnTurn:0, spawnPosition:[4,0] });

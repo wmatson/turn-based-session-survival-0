@@ -1,7 +1,11 @@
 export const ENEMY_DEFINITIONS = {
-  'red-square': { hp: 1, contactDamage: 1, movementPeriod: 3, shape: 'square', color: '#e55252' },
-  'blue-square': { hp: 3, contactDamage: 2, movementPeriod: 3, shape: 'square', color: '#4f8cff' },
-  'green-circle': { hp: 1, contactDamage: 1, movementPeriod: 2, shape: 'circle', color: '#62d47e' },
+  'red-square': { hp: 1, contactDamage: 1, movementPeriod: 3, xp: 1, goldChance: 2, gold: 1, shape: 'square', color: '#e55252' },
+  'blue-square': { hp: 3, contactDamage: 2, movementPeriod: 3, xp: 3, goldChance: 2, gold: 1, shape: 'square', color: '#4f8cff' },
+  'green-circle': { hp: 1, contactDamage: 1, movementPeriod: 2, xp: 1, goldChance: 2, gold: 1, shape: 'circle', color: '#62d47e' },
+};
+
+export const BREAKABLE_DEFINITIONS = {
+  jar: { hp: 1, healthChance: 25, goldChance: 35, gold: 2, health: 3 },
 };
 
 export const WEAPON_DEFINITIONS = {
