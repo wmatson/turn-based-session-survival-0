@@ -1,4 +1,5 @@
-import { terrainAt, VIEWPORT_RADIUS } from './engine.js';
+import { terrainAt } from './engine.js';
+import { VIEWPORT_RADIUS } from './engine/constants.js';
 import { ENEMY_DEFINITIONS, WEAPON_DEFINITIONS } from './config.js';
 const NS = 'http://www.w3.org/2000/svg';
 const svgEl = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
