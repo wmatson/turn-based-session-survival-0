@@ -154,7 +154,7 @@ Saved progression is normalized when loaded:
 - malformed save data falls back safely;
 - storage write failures no longer interrupt the between-run transition.
 
-Starting weapon unlocks were added as one-time permanent upgrades costing 100 gold each for the additional weapons. Knife is unlocked by default. The Between Runs screen exposes a starting-weapon selector; Knife remains the fallback, while any unlocked configured weapon can replace it for the next run.
+Starting weapon unlocks were added as one-time permanent upgrades costing 100 gold each for the additional weapons. Knife is unlocked by default. The Between Runs screen exposes weapon tiles that both purchase locked starting weapons and select unlocked ones; Knife remains the fallback, while any unlocked configured weapon can replace it for the next run.
 
 Pickup collection is contact-only without Starting Magnet: a pickup must share the player's tile. One Starting Magnet rank expands the collection radius to the four cardinally adjacent tiles.
 

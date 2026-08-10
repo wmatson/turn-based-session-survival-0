@@ -11,7 +11,7 @@ export const BREAKABLE_DEFINITIONS = {
 
 export const WEAPON_DEFINITIONS = {
   knife: {
-    damage: 1, range: 2, period: 5, phase: 'preEnemyMove',
+    name: 'Knife', description: 'Reliable forward strikes', icon: '⚔', damage: 1, range: 2, period: 5, phase: 'preEnemyMove',
     targeting: { mode: 'vectors', vectors: [[1, 0], [2, 0]], extend: [1, 0] },
     damagesObjects: true, effectColor: '#ffd166',
     upgrades: [
@@ -21,7 +21,7 @@ export const WEAPON_DEFINITIONS = {
     ],
   },
   'orbiting-stone': {
-    damage: 1, period: 7, phase: 'postEnemyMove',
+    name: 'Orbiting Stone', description: 'Hits enemies around you', icon: '✦', damage: 1, period: 7, phase: 'postEnemyMove',
     targeting: { mode: 'vectors', vectors: [[1, 0], [-1, 0], [0, 1], [0, -1]] },
     damagesObjects: false, effectColor: '#8be9fd',
     upgrades: [
@@ -30,7 +30,7 @@ export const WEAPON_DEFINITIONS = {
     ],
   },
   crossbow: {
-    damage: 1, range: 6, period: 8, phase: 'preEnemyMove',
+    name: 'Crossbow', description: 'Long-range line shot', icon: '➶', damage: 1, range: 6, period: 8, phase: 'preEnemyMove',
     targeting: { mode: 'first-in-line' },
     damagesObjects: true, effectColor: '#8be9fd',
     upgrades: [
@@ -39,7 +39,7 @@ export const WEAPON_DEFINITIONS = {
     ],
   },
   axe: {
-    damage: 1, range: 1, period: 6, phase: 'preEnemyMove',
+    name: 'Axe', description: 'Wide three-cell sweep', icon: '◈', damage: 1, range: 1, period: 6, phase: 'preEnemyMove',
     targeting: { mode: 'vectors', vectors: [[1, -1], [1, 0], [1, 1]] },
     damagesObjects: true, effectColor: '#ff9f68',
     upgrades: [
@@ -47,13 +47,13 @@ export const WEAPON_DEFINITIONS = {
     ],
   },
   'lightning-bolt': {
-    damage: 1, period: 5, phase: 'preEnemyMove',
+    name: 'Lightning Bolt', description: 'Randomly strikes on-screen enemies', icon: 'ϟ', damage: 1, period: 5, phase: 'preEnemyMove',
     targeting: { mode: 'random-visible' },
     damagesObjects: false, effectColor: '#ff5d73',
     upgrades: [],
   },
   'fire-wave': {
-    damage: 1, period: 10, phase: 'preEnemyMove',
+    name: 'Fire Wave', description: 'Persistent two-cell wave', icon: '♨', damage: 1, period: 10, phase: 'preEnemyMove',
     targeting: { mode: 'projectile', speed: 2 },
     damagesObjects: false, effectColor: '#ff7b32',
     upgrades: [],
