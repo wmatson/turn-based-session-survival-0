@@ -32,8 +32,26 @@ const act = (state, action = ACTIONS.wait, random = rng()) => step(state, action
 test('configured permanent upgrades modify the corresponding starting values', () => {
   const state = createGame({ seed: 7, permanent: { toughness: 2, startingMagnet: 1, sharpStart: 1 } });
   assert.equal(state.player.maxHp, 12);
-  assert.equal(state.player.pickupRange, 2);
+  assert.equal(state.player.pickupRange, 1);
   assert.equal(state.player.weapons[0].damage, 2);
+});
+
+test('pickup collection is contact-only by default and reaches adjacent cells with Starting Magnet', () => {
+  const pickups = [
+    { id: 1, type: 'gold', position: [0, 0], value: 1 },
+    { id: 2, type: 'gold', position: [1, 0], value: 2 },
+    { id: 3, type: 'gold', position: [1, 1], value: 4 },
+  ];
+  const withoutMagnet = createGame({ seed: 8 });
+  withoutMagnet.pickups = structuredClone(pickups);
+  const defaultResult = act(withoutMagnet, ACTIONS.wait);
+  assert.equal(defaultResult.state.runGold, 1);
+  assert.deepEqual(defaultResult.state.pickups.map(pickup => pickup.id), [2, 3]);
+  const withMagnet = createGame({ seed: 8, permanent: { startingMagnet: 1 } });
+  withMagnet.pickups = structuredClone(pickups);
+  const magnetResult = act(withMagnet, ACTIONS.wait);
+  assert.equal(magnetResult.state.runGold, 3);
+  assert.deepEqual(magnetResult.state.pickups.map(pickup => pickup.id), [3]);
 });
 
 test('unlocked starting weapon selection replaces the default Knife', () => {
@@ -74,6 +92,24 @@ test('pots are generated in chunks away from the origin as the player travels', 
   assert.ok(state.breakables.some(object => object.position[0] >= 80));
 });
 
+test('chests are generated one in ten distant chunks and contain 10 gold', () => {
+  let state = createGame({ seed: 1 });
+  state.player.position = [132, 28];
+  state = act(state, ACTIONS.wait).state;
+  const chests = state.breakables.filter(object => object.type === 'chest');
+  assert.ok(chests.length >= 1);
+  assert.ok(chests.every(chest => Math.abs(chest.position[0]) + Math.abs(chest.position[1]) >= 100));
+  state.player.pickupRange = 1;
+  state.player.position = [0, 0];
+  state.player.facing = 'east';
+  state.player.weapons = [{ id: 'knife', type: 'knife', ...WEAPON_DEFINITIONS.knife, period: 1 }];
+  const chest = chests[0];
+  chest.position = [1, 0];
+  state.breakables = [chest];
+  const result = act(state, ACTIONS.wait, rng([99, 99, 99]));
+  assert.equal(result.state.runGold, 10);
+});
+
 test('blocked movement changes facing but not position', () => {
   const state = createGame({ seed: 3 });
   state.breakables.push({ id: 99, type: 'jar', position: [1, 0], hp: 1 });
@@ -84,7 +120,7 @@ test('blocked movement changes facing but not position', () => {
 });
 
 test('knife fires on turn five before enemy movement and kills in range', () => {
-  let state = createGame({ seed: 1 });
+  let state = createGame({ seed: 1 }); state.player.pickupRange = 1;
   state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2,0] });
   for (let i = 0; i < 5; i++) { const result = act(state, i === 0 ? ACTIONS.waitFacing('east') : ACTIONS.wait); state = result.state; if (i === 4) { assert.ok(result.events.some(e => e.type === 'weapon-fired' && e.weapon === 'knife')); assert.equal(state.enemies.length, 0); assert.equal(state.player.xp, 1); } }
 });
@@ -108,6 +144,13 @@ test('spawn schedule and deterministic spawn perimeter', () => {
   assert.ok(state.enemies.every(e => Math.max(Math.abs(e.position[0]), Math.abs(e.position[1])) >= 17));
   assert.deepEqual(spawnRulesForTurn(10), [{ enemyType: 'red-square', count: 2 }]);
   assert.deepEqual(spawnRulesForTurn(50), [{ enemyType: 'red-square', count: 4 }]);
+  assert.deepEqual(spawnRulesForTurn(450), [
+    { enemyType: 'blue-square', count: 2 },
+    { enemyType: 'green-circle', count: 4 },
+    { enemyType: 'red-square', count: 4 },
+  ]);
+  assert.equal(spawnRulesForTurn(600).filter(rule => rule.enemyType === 'blue-square').reduce((total, rule) => total + rule.count, 0), 4);
+  assert.equal(spawnRulesForTurn(800).filter(rule => rule.enemyType === 'green-circle').reduce((total, rule) => total + rule.count, 0), 8);
 });
 
 test('outrun enemies are respawned just outside the viewport', () => {
@@ -127,36 +170,36 @@ test('turn 200 introduces durable blue squares and fast green circles', () => {
 });
 
 test('blue squares award more XP than basic enemies', () => {
-  let state = createGame({ seed: 17 }); state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
+  let state = createGame({ seed: 17 }); state.player.pickupRange = 1; state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
   state.enemies.push({ id: 1, type:'blue-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
   state = act(state, ACTIONS.wait, rng([99])).state;
   assert.equal(state.player.xp, 3);
 });
 
 test('enemy gold drops are chance-based while XP always drops', () => {
-  let state = createGame({ seed: 18 }); state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
+  let state = createGame({ seed: 18 }); state.player.pickupRange = 1; state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
   state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
   state = act(state, ACTIONS.wait, rng([99])).state;
   assert.equal(state.player.xp, 1); assert.equal(state.runGold, 0);
-  state = createGame({ seed: 19 }); state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
+  state = createGame({ seed: 19 }); state.player.pickupRange = 1; state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1, damagesObjects:false }]; state.player.facing = 'east';
   state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
   state = act(state, ACTIONS.wait, rng([1])).state;
   assert.equal(state.player.xp, 1); assert.equal(state.runGold, 1);
 });
 
 test('pots can drop health and gold pickups', () => {
-  let state = createGame({ seed: 20 }); state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1 }]; state.player.facing = 'east';
+  let state = createGame({ seed: 20 }); state.player.pickupRange = 1; state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1 }]; state.player.facing = 'east';
   state.breakables = [{ id: 99, type:'jar', position:[1,0], hp:1 }];
   const result = act(state, ACTIONS.wait, rng([0, 0, 1]));
   assert.equal(result.state.breakables.length, 0);
   assert.ok(result.events.some(e => e.type === 'pickup-spawned' && e.pickupType === 'health'));
   assert.ok(result.events.some(e => e.type === 'pickup-spawned' && e.pickupType === 'gold'));
   assert.ok(!result.events.some(e => e.type === 'pickup-spawned' && e.pickupType === 'enemy-kill'));
-  assert.equal(result.state.runGold, 2);
+  assert.equal(result.state.runGold, 5);
 });
 
 test('pots can drop a red X that clears all enemies when collected', () => {
-  let state = createGame({ seed: 26 });
+  let state = createGame({ seed: 26 }); state.player.pickupRange = 1;
   state.player.weapons = [{ id:'knife', type:'knife', ...WEAPON_DEFINITIONS.knife, period:1 }];
   state.player.facing = 'east';
   state.breakables = [{ id: 99, type:'jar', position:[1,0], hp:1 }];
@@ -274,7 +317,7 @@ test('green circles move every two turns while red squares retain three-turn mov
 });
 
 test('xp levels, choices are unique, and selected upgrade applies', () => {
-  let state = createGame({ seed: 5 }); state.player.xp = 4; state.player.facing = 'east'; state.player.weapons[0].period = 1;
+  let state = createGame({ seed: 5 }); state.player.pickupRange = 1; state.player.xp = 4; state.player.facing = 'east'; state.player.weapons[0].period = 1;
   state.enemies.push({ id: 1, type:'red-square', position:[1,0], hp:1, spawnTurn:0, spawnPosition:[1,0] });
   let result = act(state, ACTIONS.wait); state = result.state;
   assert.equal(state.pendingUpgradeChoices.length, 3); assert.equal(new Set(state.pendingUpgradeChoices).size, 3);

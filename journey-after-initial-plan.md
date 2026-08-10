@@ -66,9 +66,11 @@ Enemy XP is guaranteed. Enemy gold is an independent low-probability drop rather
 
 Breakable pots were added as blocking generated objects. Pot generation uses two independent attempts in qualifying chunks, producing roughly one qualifying chunk in four and allowing some chunks to contain two pots.
 
-Pot destruction can produce health, gold, or (at a 1% independent chance) a red-X enemy-kill pickup. Collecting the red X kills all current enemies through the normal enemy-death/drop event path. Health pickups use a localized SVG cross so their size remains consistent with the tile graphics.
+Pot destruction can produce health, 5-gold, or (at a 1% independent chance) a red-X enemy-kill pickup. Collecting the red X kills all current enemies through the normal enemy-death/drop event path. Health pickups use a localized SVG cross so their size remains consistent with the tile graphics.
 
 Pot chunks are generated lazily around the player's current and attempted destination chunks. This preserves deterministic two-attempt generation while allowing pots to appear throughout the infinite world instead of only in the initial origin neighborhood.
+
+Distant chunks also have an independent 1-in-10 chance to contain a small chest once its deterministic position is at least 100 Manhattan tiles from origin. Breaking a chest guarantees a 10-gold pickup.
 
 ### Weapons
 
@@ -98,6 +100,8 @@ Regeneration was added as a stackable upgrade:
 ### Victory and continuation
 
 The nominal victory threshold is now turn 500 rather than turn 200. The victory screen allows the player to continue indefinitely or exit and bank the run's gold.
+
+At wave 450, four additional red squares spawn every wave. Together with the existing two blue squares and four green circles, that makes ten enemies per ten-turn interval against nine weapon-fire opportunities when all periodic weapon upgrades are applied. Continuation beyond victory adds two more blue squares at wave 600 and four more green circles at wave 800.
 
 The turn limiter was later removed. Actions are now processed immediately whenever the engine is in the `playing` state. This keeps the game turn-based while avoiding input lag and animation-related action queuing.
 
@@ -151,6 +155,8 @@ Saved progression is normalized when loaded:
 - storage write failures no longer interrupt the between-run transition.
 
 Starting weapon unlocks were added as one-time permanent upgrades costing 100 gold each for the additional weapons. Knife is unlocked by default. The Between Runs screen exposes a starting-weapon selector; Knife remains the fallback, while any unlocked configured weapon can replace it for the next run.
+
+Pickup collection is contact-only without Starting Magnet: a pickup must share the player's tile. One Starting Magnet rank expands the collection radius to the four cardinally adjacent tiles.
 
 ### Effect lifecycle isolation
 

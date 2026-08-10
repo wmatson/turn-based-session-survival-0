@@ -23,6 +23,9 @@ const addBreakablesForChunk = (state, chunkX, chunkY) => {
     const candidate = [chunkX * CHUNK_SIZE + 4 + h % 11, chunkY * CHUNK_SIZE + 4 + Math.floor(h / 17) % 11];
     if (key(candidate) !== '0,0' && terrainAt(state.map, ...candidate) === 'floor' && !state.breakables.some(object => key(object.position) === key(candidate))) state.breakables.push({ id: state.nextEntityId++, type: 'jar', position: candidate, hp: BREAKABLE_DEFINITIONS.jar.hp });
   }
+  const chestHash = hashSeed(state.seed, chunkX, chunkY, 193);
+  const chestPosition = [chunkX * CHUNK_SIZE + 4 + chestHash % 11, chunkY * CHUNK_SIZE + 4 + Math.floor(chestHash / 17) % 11];
+  if (chestHash % 10 === 0 && Math.abs(chestPosition[0]) + Math.abs(chestPosition[1]) >= 100 && terrainAt(state.map, ...chestPosition) === 'floor' && !state.breakables.some(object => key(object.position) === key(chestPosition))) state.breakables.push({ id: state.nextEntityId++, type: 'chest', position: chestPosition, hp: BREAKABLE_DEFINITIONS.chest.hp });
 };
 
 const ensureBreakables = (state, positions) => {
@@ -35,7 +38,7 @@ const ensureBreakables = (state, positions) => {
 };
 
 export const createGame = ({ seed = 1, permanent = {}, startingWeapon = 'knife', victoryTurn = VICTORY_TURN } = {}) => {
-  const startingStats = { maxHp: 10, pickupRange: 1 };
+  const startingStats = { maxHp: 10, pickupRange: 0 };
   const weaponStats = { knife: { damage: WEAPON_DEFINITIONS.knife.damage } };
   const startingWeapons = new Set(['knife']);
   for (const definition of PERMANENT_UPGRADE_DEFINITIONS) {

@@ -5,7 +5,8 @@ export const ENEMY_DEFINITIONS = {
 };
 
 export const BREAKABLE_DEFINITIONS = {
-  jar: { hp: 1, healthChance: 25, goldChance: 35, enemyKillChance: 1, gold: 2, health: 3 },
+  jar: { hp: 1, healthChance: 25, goldChance: 35, enemyKillChance: 1, gold: 5, health: 3 },
+  chest: { hp: 1, healthChance: 0, goldChance: 100, enemyKillChance: 0, gold: 10 },
 };
 
 export const WEAPON_DEFINITIONS = {
@@ -83,6 +84,9 @@ export const SPAWN_BANDS = [
   { minTurn: 100, maxTurn: 149, enemyType: 'red-square', count: 8 },
   { minTurn: 200, maxTurn: Infinity, enemyType: 'blue-square', count: 2 },
   { minTurn: 200, maxTurn: Infinity, enemyType: 'green-circle', count: 4 },
+  { minTurn: 450, maxTurn: Infinity, enemyType: 'red-square', count: 4 },
+  { minTurn: 600, maxTurn: Infinity, enemyType: 'blue-square', count: 2 },
+  { minTurn: 800, maxTurn: Infinity, enemyType: 'green-circle', count: 4 },
 ];
 
 export const PERMANENT_UPGRADE_COSTS = {

@@ -30,7 +30,8 @@ export const renderGame = (svg, state, debug = false, effects = []) => {
   }
   for (const object of state.breakables) if (inViewport(object.position, state.player.position)) {
     const [x, y] = at(object.position);
-    worldContent.append(svgEl('rect', { x: x + 2, y: y + 2, width: 8, height: 8, fill: 'none', stroke: '#d9a441', 'stroke-width': 2, rx: 2 }));
+    if (object.type === 'chest') worldContent.append(svgEl('rect', { x: x + 1, y: y + 4, width: 10, height: 7, fill: '#8c552e', stroke: '#e8b85c', 'stroke-width': 1, rx: 1 }), svgEl('path', { d: `M${x+1} ${y+4} Q${x+6} ${y-1} ${x+11} ${y+4}`, fill: '#b8783d', stroke: '#e8b85c', 'stroke-width': 1 }), svgEl('rect', { x: x + 5, y: y + 5, width: 2, height: 3, fill: '#ffe08a' }));
+    else worldContent.append(svgEl('rect', { x: x + 2, y: y + 2, width: 8, height: 8, fill: 'none', stroke: '#d9a441', 'stroke-width': 2, rx: 2 }));
   }
   for (const pickup of state.pickups) if (inViewport(pickup.position, state.player.position)) {
     const [x, y] = at(pickup.position);
