@@ -1,7 +1,7 @@
-import { PERMANENT_UPGRADE_COSTS } from './config.js';
+import { PERMANENT_UPGRADE_COSTS, PERMANENT_UPGRADE_DEFINITIONS } from './config.js';
 
 const KEY = 'session-survival-save-v1';
-const defaults = { gold: 0, permanentUpgrades: { toughness: 0, startingMagnet: 0, sharpStart: 0 } };
+const defaults = { gold: 0, permanentUpgrades: Object.fromEntries(PERMANENT_UPGRADE_DEFINITIONS.map(({ id }) => [id, 0])) };
 
 const integerOr = (value, fallback = 0) => Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
 const normalizeRank = (id, value) => Math.min(integerOr(value), PERMANENT_UPGRADE_COSTS[id]?.length ?? 0);

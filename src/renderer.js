@@ -35,8 +35,15 @@ export const renderGame = (svg, state, debug = false, effects = []) => {
   for (const pickup of state.pickups) if (inViewport(pickup.position, state.player.position)) {
     const [x, y] = at(pickup.position);
     if (pickup.type === 'xp') worldContent.append(svgEl('polygon', { points: `${x+6},${y+2} ${x+10},${y+6} ${x+6},${y+10} ${x+2},${y+6}`, fill: '#62d6ff' }));
+    else if (pickup.type === 'enemy-kill') worldContent.append(svgEl('line', { x1: x + 3, y1: y + 3, x2: x + 9, y2: y + 9, stroke: '#e55252', 'stroke-width': 2 }), svgEl('line', { x1: x + 9, y1: y + 3, x2: x + 3, y2: y + 9, stroke: '#e55252', 'stroke-width': 2 }));
     else if (pickup.type === 'health') worldContent.append(svgEl('path', { d: 'M4 0h4v4h4v4H8v4H4v-4H0V4h4z', transform: `translate(${x},${y})`, fill: '#67e58b' }));
     else worldContent.append(svgEl('circle', { cx: x + 6, cy: y + 6, r: 4, fill: '#ffd166', stroke: '#fff0a8', 'stroke-width': 1 }));
+  }
+  const projectileDelta = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
+  for (const projectile of state.projectiles) if (inViewport(projectile.position, state.player.position)) {
+    const [x, y] = at(projectile.position), [dx, dy] = projectileDelta[projectile.direction] ?? [1, 0];
+    worldContent.append(svgEl('line', { x1: x + 6 - dx * 4, y1: y + 6 - dy * 4, x2: x + 6 + dx * 4, y2: y + 6 + dy * 4, stroke: '#ff7b32', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: .9 }));
+    worldContent.append(svgEl('circle', { cx: x + 6, cy: y + 6, r: 3, fill: '#ffd166', opacity: .95 }));
   }
   const trailArrow = (from, to) => {
     const [x1, y1] = at(from), [x2, y2] = at(to);
@@ -61,7 +68,11 @@ export const renderGame = (svg, state, debug = false, effects = []) => {
   }
   for (const effect of effects) if (effect.type === 'weapon-fired') {
     const definition = WEAPON_DEFINITIONS[effect.weapon] ?? WEAPON_DEFINITIONS.knife;
-    for (const cell of effect.cells) { const [x, y] = at(cell); worldContent.append(svgEl('polygon', { points: weaponPoints(x, y, effect.direction), fill: definition.effectColor, opacity: .85, class: 'weapon-effect' })); }
+    for (const cell of effect.cells) {
+      const [x, y] = at(cell);
+      if (effect.weapon === 'lightning-bolt') worldContent.append(svgEl('polyline', { points: `${x+6},${y-6} ${x+4},${y+2} ${x+7},${y+2} ${x+3},${y+12} ${x+8},${y+4} ${x+5},${y+4} ${x+9},${y-6}`, fill: 'none', stroke: definition.effectColor, 'stroke-width': 1.5, 'stroke-linejoin': 'round', opacity: .9 }));
+      else worldContent.append(svgEl('polygon', { points: weaponPoints(x, y, effect.direction), fill: definition.effectColor, opacity: .85, class: 'weapon-effect' }));
+    }
   }
   const x = half * size, y = half * size;
   playerLayer.append(svgEl('circle', { cx: x + 6, cy: y + 6, r: 4.5, fill: '#f4f7ff', stroke: '#7c5cff', 'stroke-width': 2 }));

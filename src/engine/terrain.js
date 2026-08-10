@@ -1,5 +1,6 @@
+export const CHUNK_SIZE = 20;
 export const distance = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
-export const chunkOf = (x, y) => [Math.floor(x / 20), Math.floor(y / 20)];
+export const chunkOf = (x, y) => [Math.floor(x / CHUNK_SIZE), Math.floor(y / CHUNK_SIZE)];
 export const hashSeed = (...values) => {
   let hash = 2166136261 >>> 0;
   for (const value of values) {
@@ -12,8 +13,8 @@ export const hashSeed = (...values) => {
 const chunkWall = (map, chunkX, chunkY) => {
   const hash = hashSeed(map.seed, chunkX, chunkY);
   return {
-    x: chunkX * 20 + 2 + hash % 15,
-    y: chunkY * 20 + 2 + Math.floor(hash / 31) % 15,
+    x: chunkX * CHUNK_SIZE + 2 + hash % 15,
+    y: chunkY * CHUNK_SIZE + 2 + Math.floor(hash / 31) % 15,
   };
 };
 

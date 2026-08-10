@@ -19,7 +19,7 @@ Open the served URL. No build toolchain or server runtime is required for deploy
 - Space: wait
 - Touch buttons are available below the board
 
-The debug button shows the current world coordinate and entity counter. Use the seed field to reproduce a run.
+The debug button shows the current world coordinate and entity counter. Use the seed field to reproduce a run. Between runs, permanent upgrades cost gold; Knife is always available, and each additional weapon has a one-time 100-gold starting unlock. Select any unlocked starting weapon before beginning the next run.
 
 ## Project layout
 
@@ -31,7 +31,12 @@ The debug button shows the current world coordinate and entity counter. Use the 
 - `src/persistence.js`: replaceable permanent progression storage
 - `test/engine.test.js`: engine regression and determinism tests
 
-To create a variant, start with `src/config.js`: add or modify enemy/weapon/upgrade definitions and spawn bands without changing the state-transition engine. Targeting behavior names such as `line`, `first-in-line`, and `adjacent` are interpreted by the engine.
+## Planning and implementation history
+
+- [`initial-plan.md`](./initial-plan.md): original implementation plan and acceptance criteria
+- [`journey-after-initial-plan.md`](./journey-after-initial-plan.md): implementation history, revised decisions, review findings, and current follow-up work
+
+To create a variant, start with `src/config.js`: add or modify enemy/weapon/upgrade definitions and spawn bands without changing the state-transition engine. Static burst weapons use declarative player-relative `[forward, lateral]` vectors; dynamic targeting modes such as `line` and `first-in-line` are interpreted by the engine.
 
 ## GitHub Pages
 
