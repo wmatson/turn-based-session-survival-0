@@ -1,10 +1,10 @@
-import { ACTIONS, DELTAS, DIRECTIONS, OUTRUN_RADIUS, SPAWN_RADIUS, VIEWPORT_RADIUS, VICTORY_TURN } from './engine/constants.js';
+import { ACTIONS, DELTAS, DIRECTIONS, OUTRUN_RADIUS, SPAWN_RADIUS, SURVIVAL_REWARD_GOLD, VIEWPORT_RADIUS, VICTORY_TURN } from './engine/constants.js';
 import { BREAKABLE_DEFINITIONS, ENEMY_DEFINITIONS, PERMANENT_UPGRADE_DEFINITIONS, UPGRADE_DEFINITIONS, WEAPON_DEFINITIONS, getUpgrade, xpRequired } from './config.js';
 import { CHUNK_SIZE, chunkOf, distance, hashSeed, terrainAt } from './engine/terrain.js';
 import { normalizeRng, seededRng } from './engine/random.js';
 import { spawnRulesForTurn } from './engine/waves.js';
 
-export { ACTIONS, chunkOf, distance, getUpgrade, hashSeed, seededRng, terrainAt, VICTORY_TURN, xpRequired };
+export { ACTIONS, chunkOf, distance, getUpgrade, hashSeed, seededRng, terrainAt, SURVIVAL_REWARD_GOLD, VICTORY_TURN, xpRequired };
 
 const clone = value => structuredClone(value);
 const key = p => `${p[0]},${p[1]}`;
@@ -80,6 +80,7 @@ const fireWeapon = (state, weapon, events, rng) => {
   const origin = [...state.player.position];
   const cells = [];
   let targets = [];
+  let targetIds = [];
   if (mode === 'vectors') {
     const vectors = targeting.extend
       ? Array.from({ length: weapon.range }, (_, index) => targeting.extend.map(component => component * (index + 1)))
@@ -92,6 +93,7 @@ const fireWeapon = (state, weapon, events, rng) => {
       const target = visible[rng.nextInt(visible.length)];
       cells.push([...target.position]);
       targets = [target];
+      targetIds = [target.id];
     }
   } else if (mode === 'projectile') {
     const projectile = { id: state.nextEntityId++, type: weapon.type, position: [...origin], direction: state.player.facing, speed: targeting.speed, damage: weapon.damage };
@@ -109,14 +111,26 @@ const fireWeapon = (state, weapon, events, rng) => {
     }
     if (mode === 'line') targets = state.enemies.filter(enemy => cells.some(cell => key(cell) === key(enemy.position)));
   }
-  events.push(event('weapon-fired', { weapon: weapon.type, origin, direction: state.player.facing, cells }));
-  for (const target of [...targets]) if (state.enemies.some(enemy => enemy.id === target.id)) damageEnemy(state, target, weapon.damage, events, rng);
-  if (damagesObjects) for (const object of [...state.breakables]) if (cells.some(cell => key(cell) === key(object.position))) damageObject(state, object, weapon.damage, events, rng);
+  const projectile = { id: state.nextEntityId++, type: weapon.type, weapon: weapon.type, position: origin, direction: state.player.facing, damage: weapon.damage, cells, targetIds, damagesObjects, firedTurn: state.turn };
+  if (mode !== 'projectile') {
+    projectile.duration = 1;
+    state.projectiles.push(projectile);
+    events.push(event('projectile-fired', { projectileId: projectile.id, weapon: weapon.type, position: [...origin], direction: projectile.direction, cells: cells.map(cell => [...cell]) }));
+    events.push(event('weapon-fired', { weapon: weapon.type, origin, direction: state.player.facing, cells }));
+    return;
+  }
+  const persistentProjectile = { ...projectile, speed: targeting.speed };
+  state.projectiles.push(persistentProjectile);
+  events.push(event('projectile-fired', { projectileId: persistentProjectile.id, weapon: weapon.type, position: [...origin], direction: persistentProjectile.direction }));
 };
 const runWeapons = (state, phase, events, rng) => { for (const weapon of state.player.weapons) if (weapon.phase === phase && state.turn % weapon.period === 0) fireWeapon(state, weapon, events, rng); };
 const runProjectiles = (state, events, rng) => {
   const remaining = [];
   for (const projectile of state.projectiles) {
+    if (projectile.duration != null) {
+      if (projectile.firedTurn >= state.turn) remaining.push(projectile);
+      continue;
+    }
     let active = true;
     for (let distanceMoved = 0; distanceMoved < projectile.speed && active; distanceMoved += 1) {
       const destination = pos(projectile.position, projectile.direction);
@@ -133,6 +147,16 @@ const runProjectiles = (state, events, rng) => {
     if (active) remaining.push(projectile);
   }
   state.projectiles = remaining;
+};
+const resolveTransientProjectiles = (state, events, rng) => {
+  for (const projectile of state.projectiles) {
+    if (projectile.duration == null || projectile.firedTurn !== state.turn) continue;
+    for (const target of [...state.enemies]) if ((projectile.targetIds?.includes(target.id) || projectile.cells.some(cell => key(cell) === key(target.position))) && state.enemies.some(enemy => enemy.id === target.id)) {
+      damageEnemy(state, target, projectile.damage, events, rng);
+      events.push(event('projectile-hit', { projectileId: projectile.id, enemyId: target.id, position: [...target.position] }));
+    }
+    if (projectile.damagesObjects) for (const object of [...state.breakables]) if (projectile.cells.some(cell => key(cell) === key(object.position))) damageObject(state, object, projectile.damage, events, rng);
+  }
 };
 const enemyOrder = (a, b) => a.spawnTurn - b.spawnTurn || distance(a.spawnPosition, [0,0]) - distance(b.spawnPosition, [0,0]) || a.spawnPosition[0] - b.spawnPosition[0] || a.spawnPosition[1] - b.spawnPosition[1] || a.id - b.id;
 const moveEnemies = (state, events) => {
@@ -197,5 +221,5 @@ export const step = (input, action, providedRng) => {
   ensureBreakables(state, action.type === 'move' ? [state.player.position, pos(state.player.position, action.direction)] : [state.player.position]);
   state.turn += 1;
   if (action.type === 'move' || action.type === 'wait-facing') { const direction = action.direction; if (action.type === 'move') { state.player.facing = direction; const destination = pos(state.player.position, direction, 1); if (terrainAt(state.map,...destination) === 'wall' || occupied(state,destination)) events.push(event('player-blocked', { position: [...state.player.position] })); else { const from = [...state.player.position]; state.player.position = destination; events.push(event('player-moved', { from, position: [...destination] })); } } else { state.player.facing = direction; events.push(event('player-facing-changed', { direction })); } }
-  runProjectiles(state, events, rng); if (state.status === 'playing') runWeapons(state, 'preEnemyMove', events, rng); if (state.status === 'playing') moveEnemies(state, events); if (state.status === 'playing') respawnOutrunEnemies(state, rng, events); if (state.status === 'playing') runWeapons(state, 'postEnemyMove', events, rng); if (state.status === 'playing') { spawnEnemies(state, spawnRulesForTurn(state.turn), rng, events); collectPickups(state, events, rng); offerLevelUps(state, rng, events); const regenerationLevel = state.player.regenerationLevel || 0; if (regenerationLevel > 0) { const regenerationPeriod = Math.max(10, 50 - (regenerationLevel - 1) * 10); if (state.turn % regenerationPeriod === 0) { const before = state.player.hp; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1); if (state.player.hp !== before) events.push(event('player-healed', { amount: 1, reason: 'regeneration' })); } } if (state.turn >= state.victoryTurn && !state.victoryReached && state.status === 'playing') { state.status = 'victory'; state.victoryReached = true; events.push(event('victory-reached')); } } return { state, events };
+  runProjectiles(state, events, rng); if (state.status === 'playing') runWeapons(state, 'preEnemyMove', events, rng); if (state.status === 'playing') moveEnemies(state, events); if (state.status === 'playing') respawnOutrunEnemies(state, rng, events); if (state.status === 'playing') runWeapons(state, 'postEnemyMove', events, rng); if (state.status === 'playing') resolveTransientProjectiles(state, events, rng); if (state.status === 'playing') { spawnEnemies(state, spawnRulesForTurn(state.turn), rng, events); collectPickups(state, events, rng); offerLevelUps(state, rng, events); const regenerationLevel = state.player.regenerationLevel || 0; if (regenerationLevel > 0) { const regenerationPeriod = Math.max(10, 50 - (regenerationLevel - 1) * 10); if (state.turn % regenerationPeriod === 0) { const before = state.player.hp; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1); if (state.player.hp !== before) events.push(event('player-healed', { amount: 1, reason: 'regeneration' })); } } if (state.turn >= state.victoryTurn && !state.victoryReached && state.status === 'playing') { state.status = 'victory'; state.victoryReached = true; state.runGold += SURVIVAL_REWARD_GOLD; events.push(event('survival-reward', { amount: SURVIVAL_REWARD_GOLD })); events.push(event('victory-reached')); } } return { state, events };
 };

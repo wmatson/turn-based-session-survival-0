@@ -119,10 +119,44 @@ test('blocked movement changes facing but not position', () => {
   assert.ok(result.events.some(e => e.type === 'player-blocked'));
 });
 
-test('knife fires on turn five before enemy movement and kills in range', () => {
+test('knife fires on turn five and kills in range after the unified collision trigger', () => {
   let state = createGame({ seed: 1 }); state.player.pickupRange = 1;
   state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2,0] });
   for (let i = 0; i < 5; i++) { const result = act(state, i === 0 ? ACTIONS.waitFacing('east') : ACTIONS.wait); state = result.state; if (i === 4) { assert.ok(result.events.some(e => e.type === 'weapon-fired' && e.weapon === 'knife')); assert.equal(state.enemies.length, 0); assert.equal(state.player.xp, 1); } }
+});
+
+test('non-projectile weapon attacks become one-turn projectiles and resolve one collision trigger', () => {
+  let state = createGame({ seed: 29 });
+  state.player.weapons = [{ id: 'knife', type: 'knife', ...WEAPON_DEFINITIONS.knife, period: 1 }];
+  state.player.facing = 'east';
+  state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2, 0] });
+
+  const result = act(state, ACTIONS.wait);
+
+  assert.equal(result.state.enemies.length, 0);
+  assert.equal(result.state.projectiles.length, 1);
+  assert.deepEqual(result.state.projectiles[0].cells, [[1, 0], [2, 0]]);
+  assert.equal(result.state.projectiles[0].duration, 1);
+  assert.ok(result.events.some(event => event.type === 'projectile-fired' && event.weapon === 'knife'));
+  assert.ok(result.events.some(event => event.type === 'projectile-hit' && event.enemyId === 1));
+
+  const next = act(result.state, ACTIONS.wait);
+  assert.equal(next.state.projectiles.length, 1);
+  assert.notEqual(next.state.projectiles[0].id, result.state.projectiles[0].id);
+});
+
+test('transient weapon projectiles collide after enemy movement regardless of weapon phase', () => {
+  let state = createGame({ seed: 30 });
+  state.player.weapons = [{ id: 'axe', type: 'axe', ...WEAPON_DEFINITIONS.axe, period: 1 }];
+  state.player.facing = 'east';
+  state.turn = 2;
+  state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2, 0] });
+
+  const result = act(state, ACTIONS.wait);
+
+  assert.ok(result.events.some(event => event.type === 'enemy-moved' && event.enemyId === 1));
+  assert.ok(result.events.some(event => event.type === 'projectile-hit' && event.enemyId === 1));
+  assert.equal(result.state.enemies.length, 0);
 });
 
 test('red squares move every third turn and contact damages without entering player cell', () => {
@@ -230,6 +264,20 @@ test('Lightning Bolt randomly strikes a visible enemy on its configured turn', (
   assert.deepEqual(result.events.find(event => event.type === 'weapon-fired').cells, [[4, 0]]);
 });
 
+test('Lightning Bolt hits its selected target even if that target moves before collision resolution', () => {
+  let state = createGame({ seed: 31 });
+  state.player.weapons = [{ id: 'lightning-bolt', type: 'lightning-bolt', ...WEAPON_DEFINITIONS['lightning-bolt'], period: 1 }];
+  state.player.facing = 'east';
+  state.turn = 2;
+  state.enemies.push({ id: 1, type: 'red-square', position: [2, 0], hp: 1, spawnTurn: 0, spawnPosition: [2, 0] });
+
+  const result = act(state, ACTIONS.wait, rng([0]));
+
+  assert.ok(result.events.some(event => event.type === 'enemy-moved' && event.enemyId === 1));
+  assert.ok(result.events.some(event => event.type === 'projectile-hit' && event.enemyId === 1));
+  assert.equal(result.state.enemies.length, 0);
+});
+
 test('Fire Wave launches a facing projectile every configured period and moves two cells per turn', () => {
   let state = createGame({ seed: 28 });
   state.player.weapons = [{ id: 'fire-wave', type: 'fire-wave', ...WEAPON_DEFINITIONS['fire-wave'] }];
@@ -334,7 +382,8 @@ test('post-movement orbit stone can hit an enemy after it moves', () => {
 
 test('victory at turn 500 and continue/exit controls', () => {
   let state = createGame({ seed: 1 }); state.player.weapons=[]; state.turn=499;
-  state = act(state).state; assert.equal(state.status,'victory');
+  const victory = act(state);
+  state = victory.state; assert.equal(state.status,'victory'); assert.equal(state.runGold,10); assert.ok(victory.events.some(event => event.type === 'survival-reward' && event.amount === 10));
   state = step(state, ACTIONS.continue, rng()).state; assert.equal(state.status,'playing');
   state = step(state, ACTIONS.exit, rng()).state; assert.equal(state.status,'complete');
 });

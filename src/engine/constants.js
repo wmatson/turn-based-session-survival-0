@@ -1,5 +1,6 @@
 export const DIRECTIONS = ['north', 'south', 'east', 'west'];
 export const VICTORY_TURN = 500;
+export const SURVIVAL_REWARD_GOLD = 10;
 export const VIEWPORT_RADIUS = 15;
 export const SPAWN_RADIUS = VIEWPORT_RADIUS + 2;
 export const OUTRUN_RADIUS = VIEWPORT_RADIUS + 4;

@@ -8,6 +8,7 @@ const modules = [
   '../src/engine/waves.js',
   '../src/engine.js',
   '../src/persistence.js',
+  '../src/effects.js',
   '../src/renderer.js',
 ];
 
